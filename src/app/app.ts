@@ -3,6 +3,7 @@ import express, { Application, Request, Response } from 'express';
 import authRoutes from './routes/auth.routes';
 import campaignRoutes from './routes/campaign.routes';
 import complaintRoutes from './routes/complaint.routes';
+import noticeRoutes from './routes/notice.routes';
 
 const app: Application = express();
 
@@ -32,6 +33,8 @@ app.use(express.json());
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/complaints', complaintRoutes);
 app.use('/api/v1/campaigns', campaignRoutes);
+app.use('/api/v1/notices', noticeRoutes);
+
 // ===== Root Route =====
 app.get('/', (req: Request, res: Response) => {
   res.status(200).json({
