@@ -4,10 +4,12 @@ import { CampaignService } from '../services/campaign.service';
 
 const campaignService = new CampaignService();
 
-// Helper functions
+// =======================
+// Helpers
+// =======================
 const validateCampaignData = (data: any): string | null => {
-  if (!data.title || !data.description || !data.category || !data.startDate) {
-    return 'টাইটেল, বিবরণ, ক্যাটাগরি এবং শুরুর তারিখ দিন';
+  if (!data.title || !data.description || !data.category || !data.type || !data.startDate) {
+    return 'টাইটেল, বিবরণ, ক্যাটাগরি, টাইপ এবং শুরুর তারিখ দিন';
   }
 
   if (data.title.length < 5) {
@@ -18,71 +20,46 @@ const validateCampaignData = (data: any): string | null => {
     return 'বিবরণ ২০ অক্ষরের বেশি হতে হবে';
   }
 
-  if (data.targetAmount && data.targetAmount < 0) {
-    return 'টার্গেট অ্যামাউন্ট ০ বা তার বেশি হতে হবে';
-  }
-
   return null;
 };
 
-// Type-safe parameter extraction
 const getStringParam = (param: string | string[] | undefined): string => {
-  if (Array.isArray(param)) {
-    return param[0]; // Take first element if it's an array
-  }
-  return param as string; // Cast to string
+  if (Array.isArray(param)) return param[0];
+  return param as string;
 };
 
+// =======================
 // Create Campaign
+// =======================
 export const createCampaign = async (req: Request, res: Response) => {
   try {
-    console.log('📤 Create Campaign Request Received');
-    console.log('Body:', req.body);
-    console.log('Files count:', req.files ? (req.files as Express.Multer.File[]).length : 0);
-
-    // Process uploaded images
     const uploadedFiles = req.files as Express.Multer.File[];
-    const images = [];
+    const images: any[] = [];
 
-    if (uploadedFiles && uploadedFiles.length > 0) {
-      console.log(`Processing ${uploadedFiles.length} images...`);
-
-      for (let i = 0; i < uploadedFiles.length; i++) {
-        const file = uploadedFiles[i];
-        console.log(`Image ${i + 1}:`, {
-          originalname: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size,
-          filename: file.filename,
-          path: file.path,
-        });
-
-        // Get Cloudinary image data
+    if (uploadedFiles?.length) {
+      uploadedFiles.forEach((file, index) => {
         const imageData = getCloudinaryImageData(file);
-
         images.push({
           url: imageData.url,
           publicId: imageData.publicId,
-          order: i,
+          order: index,
         });
-
-        console.log(`✅ Processed image ${i + 1}: ${imageData.url}`);
-      }
+      });
     }
 
-    // Prepare campaign data
     const campaignData = {
       title: req.body.title,
       description: req.body.description,
       images,
       category: req.body.category,
-      targetAmount: req.body.targetAmount ? parseFloat(req.body.targetAmount) : undefined,
+      type: req.body.type, // VOLUNTEER | EVENT | SOCIAL_ACTIVITY
       startDate: new Date(req.body.startDate),
       endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      location: req.body.location,
+      volunteerLimit: req.body.volunteerLimit ? parseInt(req.body.volunteerLimit) : undefined,
       priority: req.body.priority ? parseInt(req.body.priority) : 0,
     };
 
-    // Validate data
     const validationError = validateCampaignData(campaignData);
     if (validationError) {
       return res.status(400).json({
@@ -91,16 +68,14 @@ export const createCampaign = async (req: Request, res: Response) => {
       });
     }
 
-    // For now, use a mock admin ID
+    // TODO: Replace with real admin from auth middleware
     const createdBy = '65a1b2c3d4e5f67890abcdef';
 
     const result = await campaignService.createCampaign(campaignData, createdBy);
 
-    console.log('✅ Campaign created successfully:', result.campaign?._id);
-
     res.status(201).json(result);
   } catch (error: any) {
-    console.error('❌ Error creating campaign:', error);
+    console.error('❌ Create Campaign Error:', error);
     res.status(400).json({
       success: false,
       message: error.message || 'ক্যাম্পেইন তৈরি করতে সমস্যা হয়েছে',
@@ -108,15 +83,17 @@ export const createCampaign = async (req: Request, res: Response) => {
   }
 };
 
+// =======================
 // Get All Campaigns
+// =======================
 export const getAllCampaigns = async (req: Request, res: Response) => {
   try {
     const status = req.query.status as string | undefined;
-    const result = await campaignService.getAllCampaigns(status);
+    const type = req.query.type as string | undefined;
 
+    const result = await campaignService.getAllCampaigns(status, type);
     res.status(200).json(result);
   } catch (error: any) {
-    console.error('Error getting campaigns:', error);
     res.status(400).json({
       success: false,
       message: error.message || 'ক্যাম্পেইন গুলো পাওয়া যায়নি',
@@ -124,47 +101,47 @@ export const getAllCampaigns = async (req: Request, res: Response) => {
   }
 };
 
-// Get Active Campaigns
-export const getActiveCampaigns = async (req: Request, res: Response) => {
+// =======================
+// Get Active / Ongoing Campaigns
+// =======================
+export const getActiveCampaigns = async (_req: Request, res: Response) => {
   try {
     const result = await campaignService.getActiveCampaigns();
-
     res.status(200).json(result);
   } catch (error: any) {
-    console.error('Error getting active campaigns:', error);
     res.status(400).json({
       success: false,
-      message: error.message || 'সক্রিয় ক্যাম্পেইন গুলো পাওয়া যায়নি',
+      message: error.message || 'সক্রিয় ক্যাম্পেইন পাওয়া যায়নি',
     });
   }
 };
 
-// Get Single Campaign - FIXED
+// =======================
+// Get Single Campaign
+// =======================
 export const getCampaignById = async (req: Request, res: Response) => {
   try {
-    const id = getStringParam(req.params.id); // ✅ Fixed: Use helper
+    const id = getStringParam(req.params.id);
     const result = await campaignService.getCampaignById(id);
-
     res.status(200).json(result);
   } catch (error: any) {
-    console.error('Error getting campaign:', error);
-    res.status(error.message === 'ক্যাম্পেইন পাওয়া যায়নি' ? 404 : 400).json({
+    res.status(404).json({
       success: false,
       message: error.message || 'ক্যাম্পেইন পাওয়া যায়নি',
     });
   }
 };
 
-// Update Campaign - FIXED
+// =======================
+// Update Campaign
+// =======================
 export const updateCampaign = async (req: Request, res: Response) => {
   try {
-    const id = getStringParam(req.params.id); // ✅ Fixed: Use helper
-
-    // Process new images if uploaded
+    const id = getStringParam(req.params.id);
     const uploadedFiles = req.files as Express.Multer.File[];
-    let images = undefined;
 
-    if (uploadedFiles && uploadedFiles.length > 0) {
+    let images;
+    if (uploadedFiles?.length) {
       images = uploadedFiles.map((file, index) => {
         const imageData = getCloudinaryImageData(file);
         return {
@@ -175,45 +152,30 @@ export const updateCampaign = async (req: Request, res: Response) => {
       });
     }
 
-    // Prepare update data
     const updateData: any = { ...req.body };
 
-    if (images) {
-      updateData.images = images;
-    }
-
-    // Convert and validate dates
-    if (updateData.startDate) {
-      updateData.startDate = new Date(updateData.startDate);
-    }
-    if (updateData.endDate) {
-      updateData.endDate = new Date(updateData.endDate);
-    }
-
-    // Convert numbers
-    if (updateData.targetAmount) {
-      updateData.targetAmount = parseFloat(updateData.targetAmount);
-    }
-    if (updateData.priority) {
-      updateData.priority = parseInt(updateData.priority);
-    }
+    if (images) updateData.images = images;
+    if (updateData.startDate) updateData.startDate = new Date(updateData.startDate);
+    if (updateData.endDate) updateData.endDate = new Date(updateData.endDate);
+    if (updateData.volunteerLimit) updateData.volunteerLimit = parseInt(updateData.volunteerLimit);
+    if (updateData.priority) updateData.priority = parseInt(updateData.priority);
 
     const result = await campaignService.updateCampaign(id, updateData);
-
     res.status(200).json(result);
   } catch (error: any) {
-    console.error('Error updating campaign:', error);
     res.status(400).json({
       success: false,
-      message: error.message || 'ক্যাম্পেইন আপডেট করতে সমস্যা হয়েছে',
+      message: error.message || 'ক্যাম্পেইন আপডেট করা যায়নি',
     });
   }
 };
 
-// Update Campaign Status - FIXED
+// =======================
+// Update Campaign Status
+// =======================
 export const updateCampaignStatus = async (req: Request, res: Response) => {
   try {
-    const id = getStringParam(req.params.id); // ✅ Fixed: Use helper
+    const id = getStringParam(req.params.id);
     const { status } = req.body;
 
     if (!status) {
@@ -224,58 +186,58 @@ export const updateCampaignStatus = async (req: Request, res: Response) => {
     }
 
     const result = await campaignService.updateCampaignStatus(id, status);
-
     res.status(200).json(result);
   } catch (error: any) {
-    console.error('Error updating campaign status:', error);
     res.status(400).json({
       success: false,
-      message: error.message || 'স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে',
+      message: error.message || 'স্ট্যাটাস আপডেট করা যায়নি',
     });
   }
 };
 
-// Delete Campaign - FIXED
+// =======================
+// Delete Campaign
+// =======================
 export const deleteCampaign = async (req: Request, res: Response) => {
   try {
-    const id = getStringParam(req.params.id); // ✅ Fixed: Use helper
+    const id = getStringParam(req.params.id);
     const result = await campaignService.deleteCampaign(id);
-
     res.status(200).json(result);
   } catch (error: any) {
-    console.error('Error deleting campaign:', error);
-    res.status(error.message === 'ক্যাম্পেইন পাওয়া যায়নি' ? 404 : 400).json({
+    res.status(404).json({
       success: false,
-      message: error.message || 'ক্যাম্পেইন ডিলিট করতে সমস্যা হয়েছে',
+      message: error.message || 'ক্যাম্পেইন ডিলিট করা যায়নি',
     });
   }
 };
 
-// Get Campaign Statistics
-export const getCampaignStats = async (req: Request, res: Response) => {
+// =======================
+// Campaign Statistics (NO MONEY)
+// =======================
+export const getCampaignStats = async (_req: Request, res: Response) => {
   try {
     const result = await campaignService.getCampaignStats();
-
     res.status(200).json(result);
   } catch (error: any) {
-    console.error('Error getting campaign stats:', error);
     res.status(400).json({
       success: false,
-      message: error.message || 'পরিসংখ্যান পাওয়া যায়নি',
+      message: error.message || 'স্ট্যাটস পাওয়া যায়নি',
     });
   }
 };
 
-// Add Images to Campaign - FIXED
+// =======================
+// Add Images
+// =======================
 export const addImagesToCampaign = async (req: Request, res: Response) => {
   try {
-    const id = getStringParam(req.params.id); // ✅ Fixed: Use helper
+    const id = getStringParam(req.params.id);
     const uploadedFiles = req.files as Express.Multer.File[];
 
-    if (!uploadedFiles || uploadedFiles.length === 0) {
+    if (!uploadedFiles?.length) {
       return res.status(400).json({
         success: false,
-        message: 'কমপক্ষে একটি ইমেজ আপলোড করুন',
+        message: 'কমপক্ষে একটি ইমেজ দিন',
       });
     }
 
@@ -284,47 +246,41 @@ export const addImagesToCampaign = async (req: Request, res: Response) => {
       return {
         url: imageData.url,
         publicId: imageData.publicId,
+        order: index,
       };
     });
 
     const result = await campaignService.addImagesToCampaign(id, images);
-
     res.status(200).json(result);
   } catch (error: any) {
-    console.error('Error adding images:', error);
     res.status(400).json({
       success: false,
-      message: error.message || 'ইমেজ যোগ করতে সমস্যা হয়েছে',
+      message: error.message || 'ইমেজ যোগ করা যায়নি',
     });
   }
 };
 
-// Remove Image from Campaign - FIXED
+// =======================
+// Remove Image
+// =======================
 export const removeImageFromCampaign = async (req: Request, res: Response) => {
   try {
-    const id = getStringParam(req.params.id); // ✅ Fixed: Use helper
-    const publicId = getStringParam(req.params.publicId); // ✅ Fixed: Use helper
-
-    if (!publicId) {
-      return res.status(400).json({
-        success: false,
-        message: 'ইমেজ আইডি দিন',
-      });
-    }
+    const id = getStringParam(req.params.id);
+    const publicId = getStringParam(req.params.publicId);
 
     const result = await campaignService.removeImageFromCampaign(id, publicId);
-
     res.status(200).json(result);
   } catch (error: any) {
-    console.error('Error removing image:', error);
     res.status(400).json({
       success: false,
-      message: error.message || 'ইমেজ মুছতে সমস্যা হয়েছে',
+      message: error.message || 'ইমেজ মুছা যায়নি',
     });
   }
 };
 
-// Export controller object
+// =======================
+// Export
+// =======================
 export const campaignController = {
   create: createCampaign,
   getAll: getAllCampaigns,

@@ -1,3 +1,6 @@
+// =======================
+// Campaign Image
+// =======================
 export interface CampaignImage {
   url: string;
   publicId: string;
@@ -5,47 +8,99 @@ export interface CampaignImage {
   _id?: string;
 }
 
+// =======================
+// Campaign Type
+// =======================
+export type CampaignType = 'VOLUNTEER' | 'EVENT' | 'SOCIAL_ACTIVITY';
+
+// =======================
+// Campaign Status
+// =======================
+export type CampaignStatus = 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED';
+
+// =======================
+// Created By
+// =======================
+export interface CampaignCreator {
+  _id: string;
+  name: string;
+  role: 'CANDIDATE' | 'ADMIN';
+}
+
+// =======================
+// Campaign (NO MONEY, POLITICAL SAFE)
+// =======================
 export interface Campaign {
   _id: string;
   title: string;
   description: string;
   images: CampaignImage[];
+
   category: string;
-  targetAmount?: number;
-  collectedAmount: number;
+  type: CampaignType;
+
   startDate: Date;
   endDate?: Date;
-  status: string;
+
+  location?: string;
+
+  volunteerLimit?: number;
+  registeredVolunteers?: number;
+
+  status: CampaignStatus;
   priority: number;
-  createdBy: string | { _id: string; name: string; email?: string };
+
+  createdBy: CampaignCreator;
+
   createdAt: Date;
   updatedAt: Date;
 }
 
+// =======================
+// Create Campaign DTO
+// =======================
 export interface CreateCampaignDTO {
   title: string;
   description: string;
   images?: CampaignImage[];
+
   category: string;
-  targetAmount?: number;
+  type: CampaignType;
+
   startDate: Date;
   endDate?: Date;
+
+  location?: string;
+  volunteerLimit?: number;
+
   priority?: number;
 }
 
+// =======================
+// Update Campaign DTO
+// =======================
 export interface UpdateCampaignDTO {
   title?: string;
   description?: string;
   images?: CampaignImage[];
+
   category?: string;
-  targetAmount?: number;
-  collectedAmount?: number;
+  type?: CampaignType;
+
   startDate?: Date;
   endDate?: Date;
-  status?: string;
+
+  location?: string;
+  volunteerLimit?: number;
+  registeredVolunteers?: number;
+
+  status?: CampaignStatus;
   priority?: number;
 }
 
+// =======================
+// API Response
+// =======================
 export interface CampaignResponse {
   success: boolean;
   message: string;
@@ -53,16 +108,20 @@ export interface CampaignResponse {
   campaigns?: Campaign[];
 }
 
+// =======================
+// Campaign Stats (NO FINANCIAL DATA)
+// =======================
 export interface CampaignStats {
   total: number;
-  active: number;
+  upcoming: number;
+  ongoing: number;
   completed: number;
   cancelled: number;
-  totalTarget: number;
-  totalCollected: number;
-  completionRate: string;
 }
 
+// =======================
+// Campaign Stats Response
+// =======================
 export interface CampaignStatsResponse {
   success: boolean;
   message: string;

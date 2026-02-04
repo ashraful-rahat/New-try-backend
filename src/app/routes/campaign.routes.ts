@@ -1,5 +1,4 @@
 import { Router } from 'express';
-
 import { campaignController } from '../controller/campaign.controller';
 import { campaignUpload } from '../middleware/multer';
 
@@ -9,7 +8,7 @@ const router = Router();
 // PUBLIC ROUTES
 // ======================
 
-// Get active campaigns (for frontend)
+// Get active campaigns (frontend)
 router.get('/active', campaignController.getActive);
 
 // Get campaign statistics
@@ -23,16 +22,12 @@ router.get('/:id', campaignController.getById);
 // ======================
 
 // Create new campaign with multiple images
-router.post(
-  '/create',
-  campaignUpload.array('images', 10), // Max 10 images
-  campaignController.create,
-);
+router.post('/create', campaignUpload.array('images', 10), campaignController.create);
 
-// Get all campaigns (with optional status filter)
+// Get all campaigns
 router.get('/', campaignController.getAll);
 
-// Update campaign (with optional images)
+// Update campaign (info + optional images)
 router.patch('/:id', campaignUpload.array('images', 10), campaignController.update);
 
 // Update campaign status
