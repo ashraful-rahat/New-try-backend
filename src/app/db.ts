@@ -14,32 +14,32 @@ if (!globalAny._mongo) {
   globalAny._mongo = { conn: null, promise: null };
 }
 
-const connectDB = async (retries = 5, delay = 5000) => {
-  if (globalAny._mongo.conn) return globalAny._mongo.conn;
+const connectDB = async () => {
+  // যদি already connected থাকে
+  if (globalAny._mongo.conn) {
+    console.log('Using existing MongoDB connection');
+    return globalAny._mongo.conn;
+  }
 
-  while (retries > 0) {
-    try {
-      if (!globalAny._mongo.promise) {
-        globalAny._mongo.promise = mongoose.connect(config.database_url, {
-          bufferCommands: false,
-          connectTimeoutMS: 60000,
-          serverSelectionTimeoutMS: 60000,
-          socketTimeoutMS: 45000,
-        });
-      }
+  try {
+    if (!globalAny._mongo.promise) {
+      const opts = {
+        bufferCommands: true, // ⚠️ এটা true করুন Vercel এর জন্য
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+      };
 
-      globalAny._mongo.conn = await globalAny._mongo.promise;
-      console.log('✅ MongoDB connected successfully!');
-      return globalAny._mongo.conn;
-    } catch (error) {
-      console.error(`Failed to connect to MongoDB. Retries left: ${retries}`);
-      retries--;
-      if (retries === 0) {
-        throw error;
-      }
-      await new Promise((res) => setTimeout(res, delay));
-      delay *= 2; //Exponential Backoff
+      globalAny._mongo.promise = mongoose.connect(config.database_url, opts);
     }
+
+    globalAny._mongo.conn = await globalAny._mongo.promise;
+    console.log('✅ MongoDB connected successfully!');
+    return globalAny._mongo.conn;
+  } catch (error) {
+    globalAny._mongo.promise = null;
+    console.error('❌ MongoDB connection failed:', error);
+    throw error;
   }
 };
 

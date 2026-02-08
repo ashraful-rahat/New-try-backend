@@ -45,7 +45,7 @@ const ComplaintSchema: Schema = new Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'solved'],
+    enum: ['pending', 'processing', 'solved'],
     default: 'pending',
   },
   adminNote: {
